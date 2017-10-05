@@ -110,7 +110,7 @@
                     "Ref": "DesiredCapacity"
                 },
                 "HealthCheckGracePeriod": "300",
-                "HealthCheckType": "EC2",
+                "HealthCheckType": "ELB",
                 "LaunchConfigurationName": {
                     "Ref": "LaunchConfig"
                 },
@@ -443,10 +443,10 @@
                 "CrossZone": "true",
                 "HealthCheck": {
                     "HealthyThreshold": 6,
-                    "Interval": 300,
+                    "Interval": 10,
                     "Target": "TCP:80",
                     "Timeout": 5,
-                    "UnhealthyThreshold": 10
+                    "UnhealthyThreshold": 2
                 },
                 "Listeners": [
                     {
@@ -461,22 +461,6 @@
                     }
                 ],
                 "LoadBalancerName": "NAT-LoadBalancer",
-                "Policies": [
-                    {
-                        "Attributes": [
-                            {
-                                "Name": "ProxyProtocol",
-                                "Value": "true"
-                            }
-                        ],
-                        "InstancePorts": [
-                            443,
-                            80
-                        ],
-                        "PolicyName": "EnableProxyProtocol",
-                        "PolicyType": "ProxyProtocolPolicyType"
-                    }
-                ],
                 "Scheme": "internal",
                 "SecurityGroups": [
                     {

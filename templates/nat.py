@@ -329,8 +329,8 @@ LoadBalancerResource = t.add_resource(LoadBalancer(
     HealthCheck=elb.HealthCheck(
         Target="TCP:80",
         HealthyThreshold=6,
-        UnhealthyThreshold=10, #TODO: UPDATE TO REASONABLE, like 2
-        Interval=300, #TODO: UPDATE TO 10
+        UnhealthyThreshold=2, #TODO: UPDATE TO REASONABLE, like 2
+        Interval=10, #TODO: UPDATE TO 10
         Timeout=5,
     ),
     Listeners=[
@@ -349,19 +349,6 @@ LoadBalancerResource = t.add_resource(LoadBalancer(
     SecurityGroups=[Ref(AutoscalingSecurityGroupParam)],
     LoadBalancerName="NAT-LoadBalancer",
     Scheme="internal",
-    Policies=[ELBPolicy(
-        PolicyName="EnableProxyProtocol",
-        PolicyType="ProxyProtocolPolicyType",
-        Attributes=[
-                  {
-                    "Name": "ProxyProtocol",
-                    "Value": "true"
-                  }
-                ],
-        InstancePorts=[
-            443, 80
-        ]
-        )]
 ))
 
 AutoscalingGroup = t.add_resource(AutoScalingGroup(
@@ -373,7 +360,7 @@ AutoscalingGroup = t.add_resource(AutoScalingGroup(
     VPCZoneIdentifier=Ref(SubnetsWithS3EndpointParam),
     LoadBalancerNames=[Ref(LoadBalancerResource)],
     # AvailabilityZones=[Ref(VPCAvailabilityZone1), Ref(VPCAvailabilityZone2)], # Not strictly required?
-    HealthCheckType="EC2", #TODO: Change to ELB
+    HealthCheckType="ELB", #TODO: Change to ELB
     HealthCheckGracePeriod="300",
     UpdatePolicy=UpdatePolicy(
         AutoScalingReplacingUpdate=AutoScalingReplacingUpdate(
