@@ -12,7 +12,7 @@
             "Type": "AWS::EC2::SecurityGroup::Id"
         },
         "DeployBucket": {
-            "Default": "gong-cf-templates",
+            "Default": "gong-cf-templates-magic",
             "Description": "The S3 bucket with the cloudformation scripts.",
             "Type": "String"
         },
@@ -38,7 +38,7 @@
         },
         "NATInstanceType": {
             "ConstraintDescription": "must be a valid EC2 instance type.",
-            "Default": "t2.micro",
+            "Default": "m4.large",
             "Description": "EC2 instance type for NAT autoscaling group",
             "Type": "String"
         },
@@ -125,6 +125,13 @@
                 "MinSize": {
                     "Ref": "MinSize"
                 },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "PropagateAtLaunch": true,
+                        "Value": "NAT-instance"
+                    }
+                ],
                 "VPCZoneIdentifier": {
                     "Ref": "SubnetsWithS3Endpoint"
                 }

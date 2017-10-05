@@ -33,10 +33,10 @@ do
         CUM_RKBPS=$(($CUM_RKBPS + $RKBPS))
 done
 
-echo "TX_AVE $INTERFACE: $(($CUM_TKBPS/5)) kB/s RX_AVE $INTERFACE: $(($CUM_RKBPS/5)) kB/s"
+echo "TX_AVE $INTERFACE: $(($CUM_TKBPS/2)) kB/s RX_AVE $INTERFACE: $(($CUM_RKBPS/2)) kB/s"
 
 
-totalkbytes=$(($CUM_RKBPS/5))
+totalkbytes=$(($CUM_RKBPS/2))
 
 region=`curl -s 169.254.169.254/latest/meta-data/placement/availability-zone`
 region=${region::-1}

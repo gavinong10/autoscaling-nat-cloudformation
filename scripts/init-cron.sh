@@ -15,7 +15,7 @@ fi
 
 crontab -l > mycron || true
 cat > mycron << EOF
-*/5 * * * * bash /home/ec2-user/metrics.sh "$stackname"
+* * * * * bash /home/ec2-user/metrics.sh "$stackname"
 * * * * *   bash /home/ec2-user/s3-nat-watchdog.sh
 EOF
 crontab mycron

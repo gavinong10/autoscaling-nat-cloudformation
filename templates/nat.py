@@ -78,7 +78,7 @@ AutoscalingSecurityGroupParam = t.add_parameter(Parameter(
 DeployBucket = t.add_parameter(Parameter(
     "DeployBucket",
     Type="String",
-    Default="gong-cf-templates",
+    Default="gong-cf-templates-magic",
     Description="The S3 bucket with the cloudformation scripts.",
 ))
 
@@ -86,7 +86,7 @@ NATInstanceTypeParam = t.add_parameter(Parameter(
     "NATInstanceType",
     Description="EC2 instance type for NAT autoscaling group",
     Type="String",
-    Default="t2.micro", #change to "m4.large",
+    Default="m4.large",
     ConstraintDescription="must be a valid EC2 instance type."
 ))
 
@@ -372,7 +372,14 @@ AutoscalingGroup = t.add_resource(AutoScalingGroup(
             MaxBatchSize='1',
             WaitOnResourceSignals=True
         )
-    )
+    ),
+    Tags = [
+        {
+            "Key": "Name",
+            "Value": "NAT-instance",
+            "PropagateAtLaunch": True
+        }
+    ]
 ))
 
 
