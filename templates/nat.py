@@ -113,20 +113,20 @@ MaxSizeParam = t.add_parameter(Parameter(
 
 # Mapping of AMIs - TODO
 t.add_mapping('AWSAMIRegion', {
-    # "ap-northeast-1": {},
-    # "ap-northeast-2": {},
-    # "ap-south-1": {},
-    # "ap-southeast-1": {},
-    # "ap-southeast-2": {},
-    # "ca-central-1": {},
-    # "eu-central-1": {},
-    # "eu-west-1": {},
-    # "eu-west-2": {},
-    # "sa-east-1": {},
-    # "us-east-1": {},
-    # "us-east-2": {},
-    # "us-west-1": {},
-    "us-west-2": { "NATAMI": "ami-aa5ebdd2" }
+    "ap-northeast-1": { "NATAMI": "ami-17944271" },
+    "ap-northeast-2": { "NATAMI": "ami-61e03a0f" },
+    "ap-south-1": { "NATAMI": "ami-6dc38202" },
+    "ap-southeast-1": { "NATAMI": "ami-0597ea66" },
+    "ap-southeast-2": { "NATAMI": "ami-2c37d74e" },
+    "ca-central-1": { "NATAMI": "ami-f055ec94" },
+    "eu-central-1": { "NATAMI": "ami-3cec5e53" },
+    "eu-west-1": { "NATAMI": "ami-38d20741" },
+    "eu-west-2": { "NATAMI": "ami-e07d6f84" },
+    "sa-east-1": { "NATAMI": "ami-6a354a06" },
+    "us-east-1": { "NATAMI": "ami-b419e7ce" },
+    "us-east-2": { "NATAMI": "ami-8c002de9" },
+    "us-west-1": { "NATAMI": "ami-36ebdb56" },
+    "us-west-2": { "NATAMI": "ami-d08b70a8" }
 })
 
 EC2Role = t.add_resource(
