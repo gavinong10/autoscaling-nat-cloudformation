@@ -1,0 +1,515 @@
+{
+    "Mappings": {
+        "AWSAMIRegion": {
+            "us-west-2": {
+                "NATAMI": "ami-aa5ebdd2"
+            }
+        }
+    },
+    "Parameters": {
+        "AutoscalingSecurityGroup": {
+            "Description": "Security group for NAT instances & LB. Recommended inbound open for TCP 80, 443",
+            "Type": "AWS::EC2::SecurityGroup::Id"
+        },
+        "DeployBucket": {
+            "Default": "gong-cf-templates",
+            "Description": "The S3 bucket with the cloudformation scripts.",
+            "Type": "String"
+        },
+        "DesiredCapacity": {
+            "Default": 1,
+            "Description": "Number of desired NAT instances",
+            "Type": "Number"
+        },
+        "KeyPairName": {
+            "ConstraintDescription": "must be the name of an existing EC2 KeyPair.",
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+            "Type": "AWS::EC2::KeyPair::KeyName"
+        },
+        "MaxSize": {
+            "Default": 10,
+            "Description": "Max number of NAT instances",
+            "Type": "Number"
+        },
+        "MinSize": {
+            "Default": 1,
+            "Description": "Min number of NAT instances",
+            "Type": "Number"
+        },
+        "NATInstanceType": {
+            "ConstraintDescription": "must be a valid EC2 instance type.",
+            "Default": "t2.micro",
+            "Description": "EC2 instance type for NAT autoscaling group",
+            "Type": "String"
+        },
+        "SubnetsWithS3Endpoint": {
+            "Description": "The private subnets with a configured S3 endpoint. Recommended to be spread across multiple AZ's.",
+            "Type": "List<AWS::EC2::Subnet::Id>"
+        },
+        "VPCID": {
+            "Description": "The VPC ID you wish to deploy in",
+            "Type": "AWS::EC2::VPC::Id"
+        }
+    },
+    "Resources": {
+        "AlarmScaleInPolicy": {
+            "Properties": {
+                "AlarmActions": [
+                    {
+                        "Ref": "ScaleInPolicy"
+                    }
+                ],
+                "AlarmDescription": "Scale in if average traffic < 2000 KB/s for 15 minutes",
+                "ComparisonOperator": "LessThanThreshold",
+                "Dimensions": [
+                    {
+                        "Name": "StackName",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    }
+                ],
+                "EvaluationPeriods": 3,
+                "MetricName": "TotalKbytesPerSecond",
+                "Namespace": "NATGroup",
+                "Period": 300,
+                "Statistic": "Average",
+                "Threshold": "2000"
+            },
+            "Type": "AWS::CloudWatch::Alarm"
+        },
+        "AlarmScaleOutPolicy": {
+            "Properties": {
+                "AlarmActions": [
+                    {
+                        "Ref": "ScaleOutPolicy"
+                    }
+                ],
+                "AlarmDescription": "Scale out if average traffic > 5000 KB/s for 5 minutes",
+                "ComparisonOperator": "GreaterThanThreshold",
+                "Dimensions": [
+                    {
+                        "Name": "StackName",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    }
+                ],
+                "EvaluationPeriods": 1,
+                "MetricName": "TotalKbytesPerSecond",
+                "Namespace": "NATGroup",
+                "Period": 300,
+                "Statistic": "Average",
+                "Threshold": "5000"
+            },
+            "Type": "AWS::CloudWatch::Alarm"
+        },
+        "AutoscalingGroup": {
+            "Properties": {
+                "DesiredCapacity": {
+                    "Ref": "DesiredCapacity"
+                },
+                "HealthCheckGracePeriod": "300",
+                "HealthCheckType": "EC2",
+                "LaunchConfigurationName": {
+                    "Ref": "LaunchConfig"
+                },
+                "LoadBalancerNames": [
+                    {
+                        "Ref": "LoadBalancer"
+                    }
+                ],
+                "MaxSize": {
+                    "Ref": "MaxSize"
+                },
+                "MinSize": {
+                    "Ref": "MinSize"
+                },
+                "VPCZoneIdentifier": {
+                    "Ref": "SubnetsWithS3Endpoint"
+                }
+            },
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "UpdatePolicy": {
+                "AutoScalingReplacingUpdate": {
+                    "WillReplace": "true"
+                },
+                "AutoScalingRollingUpdate": {
+                    "MaxBatchSize": "1",
+                    "MinInstancesInService": "1",
+                    "PauseTime": "PT5M",
+                    "WaitOnResourceSignals": "true"
+                }
+            }
+        },
+        "EC2InstanceProfile": {
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "EC2Role"
+                    }
+                ]
+            },
+            "Type": "AWS::IAM::InstanceProfile"
+        },
+        "EC2Role": {
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRole"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ec2.amazonaws.com"
+                                ]
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyDocument": {
+                            "Statement": [
+                                {
+                                    "Action": [
+                                        "s3:GetObject"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": {
+                                        "Fn::Sub": "arn:aws:s3:::${DeployBucket}/*"
+                                    }
+                                }
+                            ],
+                            "Version": "2012-10-17"
+                        },
+                        "PolicyName": "s3-policy"
+                    },
+                    {
+                        "PolicyDocument": {
+                            "Statement": [
+                                {
+                                    "Action": [
+                                        "cloudwatch:PutMetricData"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": "*"
+                                }
+                            ],
+                            "Version": "2012-10-17"
+                        },
+                        "PolicyName": "root"
+                    }
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "LaunchConfig": {
+            "Metadata": {
+                "AWS::CloudFormation::Authentication": {
+                    "DeployUserAuth": {
+                        "buckets": [
+                            {
+                                "Ref": "DeployBucket"
+                            }
+                        ],
+                        "roleName": {
+                            "Ref": "EC2Role"
+                        },
+                        "type": "S3"
+                    }
+                },
+                "AWS::CloudFormation::Init": {
+                    "config": {
+                        "commands": {
+                            "init": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "/home/ec2-user/configure-s3-nat.sh && ",
+                                            "/home/ec2-user/init-cron.sh \"",
+                                            {
+                                                "Ref": "AWS::StackName"
+                                            },
+                                            "\" && ",
+                                            "/home/ec2-user/test-s3-nat.sh"
+                                        ]
+                                    ]
+                                }
+                            }
+                        },
+                        "files": {
+                            "/home/ec2-user/configure-s3-nat.sh": {
+                                "authentication": "DeployUserAuth",
+                                "group": "root",
+                                "mode": "000550",
+                                "owner": "root",
+                                "source": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "http://",
+                                            {
+                                                "Ref": "DeployBucket"
+                                            },
+                                            ".s3.amazonaws.com/scripts/configure-s3-nat.sh"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "/home/ec2-user/init-cron.sh": {
+                                "authentication": "DeployUserAuth",
+                                "group": "root",
+                                "mode": "000550",
+                                "owner": "root",
+                                "source": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "http://",
+                                            {
+                                                "Ref": "DeployBucket"
+                                            },
+                                            ".s3.amazonaws.com/scripts/init-cron.sh"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "/home/ec2-user/metrics.sh": {
+                                "authentication": "DeployUserAuth",
+                                "group": "root",
+                                "mode": "000550",
+                                "owner": "root",
+                                "source": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "http://",
+                                            {
+                                                "Ref": "DeployBucket"
+                                            },
+                                            ".s3.amazonaws.com/scripts/metrics.sh"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "/home/ec2-user/nat-globals.sh": {
+                                "authentication": "DeployUserAuth",
+                                "group": "root",
+                                "mode": "000550",
+                                "owner": "root",
+                                "source": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "http://",
+                                            {
+                                                "Ref": "DeployBucket"
+                                            },
+                                            ".s3.amazonaws.com/scripts/nat-globals.sh"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "/home/ec2-user/nat-lib.sh": {
+                                "authentication": "DeployUserAuth",
+                                "group": "root",
+                                "mode": "000550",
+                                "owner": "root",
+                                "source": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "http://",
+                                            {
+                                                "Ref": "DeployBucket"
+                                            },
+                                            ".s3.amazonaws.com/scripts/nat-lib.sh"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "/home/ec2-user/s3-nat-watchdog.sh": {
+                                "authentication": "DeployUserAuth",
+                                "group": "root",
+                                "mode": "000550",
+                                "owner": "root",
+                                "source": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "http://",
+                                            {
+                                                "Ref": "DeployBucket"
+                                            },
+                                            ".s3.amazonaws.com/scripts/s3-nat-watchdog.sh"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "/home/ec2-user/test-s3-nat.sh": {
+                                "authentication": "DeployUserAuth",
+                                "group": "root",
+                                "mode": "000550",
+                                "owner": "root",
+                                "source": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "http://",
+                                            {
+                                                "Ref": "DeployBucket"
+                                            },
+                                            ".s3.amazonaws.com/scripts/test-s3-nat.sh"
+                                        ]
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Properties": {
+                "IamInstanceProfile": {
+                    "Ref": "EC2InstanceProfile"
+                },
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "AWSAMIRegion",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "NATAMI"
+                    ]
+                },
+                "InstanceMonitoring": "false",
+                "InstanceType": {
+                    "Ref": "NATInstanceType"
+                },
+                "KeyName": {
+                    "Ref": "KeyPairName"
+                },
+                "SecurityGroups": [
+                    {
+                        "Ref": "AutoscalingSecurityGroup"
+                    }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "\n        #!/bin/bash -xe\n        /opt/aws/bin/cfn-init -v ",
+                                "    --resource LaunchConfig",
+                                "    --stack ",
+                                {
+                                    "Ref": "AWS::StackName"
+                                },
+                                "    --region ",
+                                {
+                                    "Ref": "AWS::Region"
+                                },
+                                "\n",
+                                "cfn-signal -e $?",
+                                "    --resource AutoscalingGroup",
+                                "    --stack ",
+                                {
+                                    "Ref": "AWS::StackName"
+                                },
+                                "    --region ",
+                                {
+                                    "Ref": "AWS::Region"
+                                },
+                                "\n"
+                            ]
+                        ]
+                    }
+                }
+            },
+            "Type": "AWS::AutoScaling::LaunchConfiguration"
+        },
+        "LoadBalancer": {
+            "Properties": {
+                "ConnectionDrainingPolicy": {
+                    "Enabled": true,
+                    "Timeout": 120
+                },
+                "CrossZone": "true",
+                "HealthCheck": {
+                    "HealthyThreshold": 6,
+                    "Interval": 300,
+                    "Target": "TCP:80",
+                    "Timeout": 5,
+                    "UnhealthyThreshold": 10
+                },
+                "Listeners": [
+                    {
+                        "InstancePort": "80",
+                        "LoadBalancerPort": "80",
+                        "Protocol": "TCP"
+                    },
+                    {
+                        "InstancePort": "443",
+                        "LoadBalancerPort": "443",
+                        "Protocol": "TCP"
+                    }
+                ],
+                "LoadBalancerName": "NAT-LoadBalancer",
+                "Policies": [
+                    {
+                        "Attributes": [
+                            {
+                                "Name": "ProxyProtocol",
+                                "Value": "true"
+                            }
+                        ],
+                        "InstancePorts": [
+                            443,
+                            80
+                        ],
+                        "PolicyName": "EnableProxyProtocol",
+                        "PolicyType": "ProxyProtocolPolicyType"
+                    }
+                ],
+                "Scheme": "internal",
+                "SecurityGroups": [
+                    {
+                        "Ref": "AutoscalingSecurityGroup"
+                    }
+                ],
+                "Subnets": {
+                    "Ref": "SubnetsWithS3Endpoint"
+                }
+            },
+            "Type": "AWS::ElasticLoadBalancing::LoadBalancer"
+        },
+        "ScaleInPolicy": {
+            "Properties": {
+                "AdjustmentType": "ChangeInCapacity",
+                "AutoScalingGroupName": {
+                    "Ref": "AutoscalingGroup"
+                },
+                "Cooldown": 300,
+                "ScalingAdjustment": -1
+            },
+            "Type": "AWS::AutoScaling::ScalingPolicy"
+        },
+        "ScaleOutPolicy": {
+            "Properties": {
+                "AdjustmentType": "ChangeInCapacity",
+                "AutoScalingGroupName": {
+                    "Ref": "AutoscalingGroup"
+                },
+                "Cooldown": 300,
+                "ScalingAdjustment": 1
+            },
+            "Type": "AWS::AutoScaling::ScalingPolicy"
+        }
+    }
+}
