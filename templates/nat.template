@@ -582,7 +582,6 @@
         "NATLBTargetGroup443": {
             "Properties": {
                 "HealthCheckIntervalSeconds": 10,
-                "HealthCheckTimeoutSeconds": 5,
                 "HealthyThresholdCount": 6,
                 "Name": {
                     "Fn::Join": [
@@ -601,7 +600,7 @@
                 },
                 "Port": 443,
                 "Protocol": "TCP",
-                "UnhealthyThresholdCount": 2,
+                "UnhealthyThresholdCount": 6,
                 "VpcId": {
                     "Ref": "VPCID"
                 }
@@ -611,7 +610,6 @@
         "NATLBTargetGroup80": {
             "Properties": {
                 "HealthCheckIntervalSeconds": 10,
-                "HealthCheckTimeoutSeconds": 5,
                 "HealthyThresholdCount": 6,
                 "Name": {
                     "Fn::Join": [
@@ -630,7 +628,7 @@
                 },
                 "Port": 80,
                 "Protocol": "TCP",
-                "UnhealthyThresholdCount": 2,
+                "UnhealthyThresholdCount": 6,
                 "VpcId": {
                     "Ref": "VPCID"
                 }
@@ -654,11 +652,6 @@
                     ]
                 },
                 "Scheme": "internal",
-                "SecurityGroups": [
-                    {
-                        "Ref": "AutoscalingSecurityGroup"
-                    }
-                ],
                 "Subnets": {
                     "Ref": "SubnetsWithS3Endpoint"
                 },
