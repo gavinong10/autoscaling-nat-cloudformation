@@ -112,17 +112,17 @@
             "Type": "String"
         },
         "ScaleInAverageThreshold": {
-            "Default": 2000,
+            "Default": 10000,
             "Description": "In KB/s (can test with 0)",
             "Type": "Number"
         },
         "ScaleInConsecutivePeriod": {
-            "Default": 3,
+            "Default": 5,
             "Description": "How many periods to consecutively breach (can test with 100)",
             "Type": "Number"
         },
         "ScaleOutAverageThreshold": {
-            "Default": 200000000,
+            "Default": 25000,
             "Description": "In KB/s",
             "Type": "Number"
         },
@@ -153,7 +153,7 @@
                         "Ref": "ScaleInPolicy"
                     }
                 ],
-                "AlarmDescription": "Scale in if average traffic < 2000 KB/s for 15 minutes",
+                "AlarmDescription": "Scale in if average traffic < 10000 KB/s for 25 minutes",
                 "ComparisonOperator": "LessThanThreshold",
                 "Dimensions": [
                     {
@@ -167,7 +167,20 @@
                     "Ref": "ScaleInConsecutivePeriod"
                 },
                 "MetricName": "TotalKbytesPerSecond",
-                "Namespace": "NATGroup2",
+                "Namespace": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "AWS::StackName"
+                            },
+                            "-",
+                            {
+                                "Ref": "NATNamespace"
+                            }
+                        ]
+                    ]
+                },
                 "Period": {
                     "Ref": "CloudWatchScalingWindow"
                 },
@@ -185,7 +198,7 @@
                         "Ref": "ScaleOutPolicy"
                     }
                 ],
-                "AlarmDescription": "Scale out if average traffic > 5000 KB/s for 5 minutes",
+                "AlarmDescription": "Scale out if average traffic > 25000 KB/s for 5 minutes",
                 "ComparisonOperator": "GreaterThanThreshold",
                 "Dimensions": [
                     {
