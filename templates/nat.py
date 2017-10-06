@@ -141,7 +141,7 @@ ScaleOutAverageThresholdParam = t.add_parameter(Parameter(
     "ScaleOutAverageThreshold",
     Description="In KB/s",
     Type="Number",
-    Default=200000000 #5000 # TODO CHANGE ME BACK
+    Default=25000
 ))
 
 ScaleOutConsecutivePeriodsParam = t.add_parameter(Parameter(
@@ -155,17 +155,15 @@ ScaleInAverageThresholdParam = t.add_parameter(Parameter(
     "ScaleInAverageThreshold",
     Description="In KB/s (can test with 0)",
     Type="Number",
-    Default=2000
+    Default=10000
 ))
 
 ScaleInConsecutivePeriodsParam = t.add_parameter(Parameter(
     "ScaleInConsecutivePeriod",
     Description="How many periods to consecutively breach (can test with 100)",
     Type="Number",
-    Default=3
+    Default=5
 ))
-
-# TODO: - set these to introduce uniqueness with global name
 
 NATInstanceNamesParam = t.add_parameter(Parameter(
     "NATInstanceNames",
@@ -541,7 +539,7 @@ ScaleInPolicy = t.add_resource(ScalingPolicy(
 
 AlarmScaleOutPolicy = t.add_resource(Alarm(
     "AlarmScaleOutPolicy",
-    AlarmDescription="Scale out if average traffic > 5000 KB/s for 5 minutes",
+    AlarmDescription="Scale out if average traffic > 25000 KB/s for 5 minutes",
     MetricName="TotalKbytesPerSecond",
     Namespace=Join("", [Ref("AWS::StackName"), "-", Ref(NATNamespaceParam)]),
     Statistic="Average",
@@ -563,9 +561,9 @@ AlarmScaleOutPolicy = t.add_resource(Alarm(
 
 AlarmScaleInPolicy = t.add_resource(Alarm(
     "AlarmScaleInPolicy",
-    AlarmDescription="Scale in if average traffic < 2000 KB/s for 15 minutes",
+    AlarmDescription="Scale in if average traffic < 10000 KB/s for 25 minutes",
     MetricName="TotalKbytesPerSecond",
-    Namespace="NATGroup2", #TODO: Change me back
+    Namespace=Join("", [Ref("AWS::StackName"), "-", Ref(NATNamespaceParam)]),
     Statistic="Average",
     Period=Ref(CloudWatchScalingWindowParam),
     EvaluationPeriods=Ref(ScaleInConsecutivePeriodsParam),
