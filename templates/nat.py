@@ -111,7 +111,85 @@ MaxSizeParam = t.add_parameter(Parameter(
     Default=10
 ))
 
-# Mapping of AMIs - TODO
+ScalingActivityCoolOffParam = t.add_parameter(Parameter(
+    "ScalingActivityCoolOff",
+    Description="How long (in seconds) to cool off before performing more scaling",
+    Type="Number",
+    Default=150 #300
+))
+
+CloudWatchScalingWindowParam = t.add_parameter(Parameter(
+    "CloudWatchScalingWindow",
+    Description="How long in seconds to constitute a Cloudwatch Period",
+    Type="Number",
+    Default=300,
+    AllowedValues=[
+        10,
+        30,
+        60,
+        300,
+        900,
+        3600,
+        21600,
+        86400
+    ],
+
+))
+
+ScaleOutAverageThresholdParam = t.add_parameter(Parameter(
+    "ScaleOutAverageThreshold",
+    Description="In KB/s",
+    Type="Number",
+    Default=200000000 #5000 # TODO CHANGE ME BACK
+))
+
+ScaleOutConsecutivePeriodsParam = t.add_parameter(Parameter(
+    "ScaleOutConsecutivePeriod",
+    Description="How many periods to consecutively breach  (can test with 100)",
+    Type="Number",
+    Default=1
+))
+
+ScaleInAverageThresholdParam = t.add_parameter(Parameter(
+    "ScaleInAverageThreshold",
+    Description="In KB/s (can test with 0)",
+    Type="Number",
+    Default=2000
+))
+
+ScaleInConsecutivePeriodsParam = t.add_parameter(Parameter(
+    "ScaleInConsecutivePeriod",
+    Description="How many periods to consecutively breach (can test with 100)",
+    Type="Number",
+    Default=3
+))
+
+# TODO: - set these to introduce uniqueness with global name
+
+NATInstanceNamesParam = t.add_parameter(Parameter(
+    "NATInstanceNames",
+    Description="Name of NAT instances",
+    Type="String",
+    Default="NAT-instance"
+))
+
+LBNameParam = t.add_parameter(Parameter(
+    "LBName",
+    Description="Name of LB",
+    Type="String",
+    Default="NAT-LB"
+))
+
+NATNamespaceParam = t.add_parameter(Parameter(
+    "NATNamespace",
+    Description="Name of NAT namespace",
+    Type="String",
+    Default="NAT-namespace"
+))
+
+########
+
+# Mapping of AMIs
 t.add_mapping('AWSAMIRegion', {
     "ap-northeast-1": { "NATAMI": "ami-17944271" },
     "ap-northeast-2": { "NATAMI": "ami-61e03a0f" },
@@ -347,10 +425,9 @@ LoadBalancerResource = t.add_resource(LoadBalancer(
     ],
     CrossZone=True,
     SecurityGroups=[Ref(AutoscalingSecurityGroupParam)],
-    LoadBalancerName="NAT-LoadBalancer",
+    LoadBalancerName=Join("", [Ref("AWS::StackName"), "-", Ref(LBNameParam)]),
     Scheme="internal",
 ))
-
 AutoscalingGroup = t.add_resource(AutoScalingGroup(
     "AutoscalingGroup",
     DesiredCapacity=Ref(DesiredCapacityParam),
@@ -360,8 +437,8 @@ AutoscalingGroup = t.add_resource(AutoScalingGroup(
     VPCZoneIdentifier=Ref(SubnetsWithS3EndpointParam),
     LoadBalancerNames=[Ref(LoadBalancerResource)],
     # AvailabilityZones=[Ref(VPCAvailabilityZone1), Ref(VPCAvailabilityZone2)], # Not strictly required?
-    HealthCheckType="ELB", #TODO: Change to ELB
-    HealthCheckGracePeriod="300",
+    HealthCheckType="ELB",
+    HealthCheckGracePeriod=300,
     UpdatePolicy=UpdatePolicy(
         AutoScalingReplacingUpdate=AutoScalingReplacingUpdate(
             WillReplace=True,
@@ -376,10 +453,12 @@ AutoscalingGroup = t.add_resource(AutoScalingGroup(
     Tags = [
         {
             "Key": "Name",
-            "Value": "NAT-instance",
+            "Value": Join("", [Ref("AWS::StackName"), "-", Ref(NATInstanceNamesParam)])
+, #TODO: Change me back
             "PropagateAtLaunch": True
         }
-    ]
+    ],
+    Cooldown=Ref(ScalingActivityCoolOffParam),
 ))
 
 
@@ -404,11 +483,11 @@ AlarmScaleOutPolicy = t.add_resource(Alarm(
     "AlarmScaleOutPolicy",
     AlarmDescription="Scale out if average traffic > 5000 KB/s for 5 minutes",
     MetricName="TotalKbytesPerSecond",
-    Namespace="NATGroup",
+    Namespace=Join("", [Ref("AWS::StackName"), "-", Ref(NATNamespaceParam)]),
     Statistic="Average",
-    Period=300,
-    EvaluationPeriods=1,
-    Threshold="5000",
+    Period=Ref(CloudWatchScalingWindowParam),
+    EvaluationPeriods=Ref(ScaleOutConsecutivePeriodsParam),
+    Threshold=Ref(ScaleOutAverageThresholdParam),
     Dimensions=[
         MetricDimension(
             "StackMetricDimension",
@@ -426,11 +505,11 @@ AlarmScaleInPolicy = t.add_resource(Alarm(
     "AlarmScaleInPolicy",
     AlarmDescription="Scale in if average traffic < 2000 KB/s for 15 minutes",
     MetricName="TotalKbytesPerSecond",
-    Namespace="NATGroup",
+    Namespace="NATGroup2", #TODO: Change me back
     Statistic="Average",
-    Period=300,
-    EvaluationPeriods=3,
-    Threshold="2000",
+    Period=Ref(CloudWatchScalingWindowParam),
+    EvaluationPeriods=Ref(ScaleInConsecutivePeriodsParam),
+    Threshold=Ref(ScaleInAverageThresholdParam),
     Dimensions=[
         MetricDimension(
             "StackMetricDimension",

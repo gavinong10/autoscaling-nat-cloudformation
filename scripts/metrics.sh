@@ -1,6 +1,6 @@
 #!/bin/bash
 
-INTERVAL="5"  # update interval in seconds
+INTERVAL="1"  # update interval in seconds
 
 INTERFACE="eth0"
 
@@ -17,26 +17,24 @@ IF=$INTERFACE
 
 CUM_TKBPS=0
 CUM_RKBPS=0
-for i in 1 2
+for i in 1 2 3 4 5
 do
         R1=`cat /sys/class/net/$INTERFACE/statistics/rx_bytes`
         T1=`cat /sys/class/net/$INTERFACE/statistics/tx_bytes`
         sleep $INTERVAL
         R2=`cat /sys/class/net/$INTERFACE/statistics/rx_bytes`
         T2=`cat /sys/class/net/$INTERFACE/statistics/tx_bytes`
-        TBPS=`expr $T2 - $T1`
-        RBPS=`expr $R2 - $R1`
-        TKBPS=`expr $TBPS / 1024`
-        RKBPS=`expr $RBPS / 1024`
+        TKBPS=`expr $T2 - $T1`
+        RKBPS=`expr $R2 - $R1`
         # echo "TX $INTERFACE: $TKBPS kB/s RX $INTERFACE: $RKBPS kB/s"
         CUM_TKBPS=$(($CUM_TKBPS + $TKBPS))
         CUM_RKBPS=$(($CUM_RKBPS + $RKBPS))
 done
 
-echo "TX_AVE $INTERFACE: $(($CUM_TKBPS/2)) kB/s RX_AVE $INTERFACE: $(($CUM_RKBPS/2)) kB/s"
+echo "TX_AVE $INTERFACE: $(($CUM_TKBPS/5/1024)) kB/s RX_AVE $INTERFACE: $(($CUM_RKBPS/5/1024)) kB/s"
 
 
-totalkbytes=$(($CUM_RKBPS/2))
+totalkbytes=$(($CUM_RKBPS/5/1024))
 
 region=`curl -s 169.254.169.254/latest/meta-data/placement/availability-zone`
 region=${region::-1}

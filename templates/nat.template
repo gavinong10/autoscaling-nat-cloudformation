@@ -1,8 +1,47 @@
 {
     "Mappings": {
         "AWSAMIRegion": {
+            "ap-northeast-1": {
+                "NATAMI": "ami-17944271"
+            },
+            "ap-northeast-2": {
+                "NATAMI": "ami-61e03a0f"
+            },
+            "ap-south-1": {
+                "NATAMI": "ami-6dc38202"
+            },
+            "ap-southeast-1": {
+                "NATAMI": "ami-0597ea66"
+            },
+            "ap-southeast-2": {
+                "NATAMI": "ami-2c37d74e"
+            },
+            "ca-central-1": {
+                "NATAMI": "ami-f055ec94"
+            },
+            "eu-central-1": {
+                "NATAMI": "ami-3cec5e53"
+            },
+            "eu-west-1": {
+                "NATAMI": "ami-38d20741"
+            },
+            "eu-west-2": {
+                "NATAMI": "ami-e07d6f84"
+            },
+            "sa-east-1": {
+                "NATAMI": "ami-6a354a06"
+            },
+            "us-east-1": {
+                "NATAMI": "ami-b419e7ce"
+            },
+            "us-east-2": {
+                "NATAMI": "ami-8c002de9"
+            },
+            "us-west-1": {
+                "NATAMI": "ami-36ebdb56"
+            },
             "us-west-2": {
-                "NATAMI": "ami-aa5ebdd2"
+                "NATAMI": "ami-d08b70a8"
             }
         }
     },
@@ -10,6 +49,21 @@
         "AutoscalingSecurityGroup": {
             "Description": "Security group for NAT instances & LB. Recommended inbound open for TCP 80, 443",
             "Type": "AWS::EC2::SecurityGroup::Id"
+        },
+        "CloudWatchScalingWindow": {
+            "AllowedValues": [
+                10,
+                30,
+                60,
+                300,
+                900,
+                3600,
+                21600,
+                86400
+            ],
+            "Default": 300,
+            "Description": "How long in seconds to constitute a Cloudwatch Period",
+            "Type": "Number"
         },
         "DeployBucket": {
             "Default": "gong-cf-templates-magic",
@@ -26,6 +80,11 @@
             "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
             "Type": "AWS::EC2::KeyPair::KeyName"
         },
+        "LBName": {
+            "Default": "NAT-LB",
+            "Description": "Name of LB",
+            "Type": "String"
+        },
         "MaxSize": {
             "Default": 10,
             "Description": "Max number of NAT instances",
@@ -36,11 +95,46 @@
             "Description": "Min number of NAT instances",
             "Type": "Number"
         },
+        "NATInstanceNames": {
+            "Default": "NAT-instance",
+            "Description": "Name of NAT instances",
+            "Type": "String"
+        },
         "NATInstanceType": {
             "ConstraintDescription": "must be a valid EC2 instance type.",
             "Default": "m4.large",
             "Description": "EC2 instance type for NAT autoscaling group",
             "Type": "String"
+        },
+        "NATNamespace": {
+            "Default": "NAT-namespace",
+            "Description": "Name of NAT namespace",
+            "Type": "String"
+        },
+        "ScaleInAverageThreshold": {
+            "Default": 2000,
+            "Description": "In KB/s (can test with 0)",
+            "Type": "Number"
+        },
+        "ScaleInConsecutivePeriod": {
+            "Default": 3,
+            "Description": "How many periods to consecutively breach (can test with 100)",
+            "Type": "Number"
+        },
+        "ScaleOutAverageThreshold": {
+            "Default": 200000000,
+            "Description": "In KB/s",
+            "Type": "Number"
+        },
+        "ScaleOutConsecutivePeriod": {
+            "Default": 1,
+            "Description": "How many periods to consecutively breach  (can test with 100)",
+            "Type": "Number"
+        },
+        "ScalingActivityCoolOff": {
+            "Default": 150,
+            "Description": "How long (in seconds) to cool off before performing more scaling",
+            "Type": "Number"
         },
         "SubnetsWithS3Endpoint": {
             "Description": "The private subnets with a configured S3 endpoint. Recommended to be spread across multiple AZ's.",
@@ -69,12 +163,18 @@
                         }
                     }
                 ],
-                "EvaluationPeriods": 3,
+                "EvaluationPeriods": {
+                    "Ref": "ScaleInConsecutivePeriod"
+                },
                 "MetricName": "TotalKbytesPerSecond",
-                "Namespace": "NATGroup",
-                "Period": 300,
+                "Namespace": "NATGroup2",
+                "Period": {
+                    "Ref": "CloudWatchScalingWindow"
+                },
                 "Statistic": "Average",
-                "Threshold": "2000"
+                "Threshold": {
+                    "Ref": "ScaleInAverageThreshold"
+                }
             },
             "Type": "AWS::CloudWatch::Alarm"
         },
@@ -95,21 +195,43 @@
                         }
                     }
                 ],
-                "EvaluationPeriods": 1,
+                "EvaluationPeriods": {
+                    "Ref": "ScaleOutConsecutivePeriod"
+                },
                 "MetricName": "TotalKbytesPerSecond",
-                "Namespace": "NATGroup",
-                "Period": 300,
+                "Namespace": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "AWS::StackName"
+                            },
+                            "-",
+                            {
+                                "Ref": "NATNamespace"
+                            }
+                        ]
+                    ]
+                },
+                "Period": {
+                    "Ref": "CloudWatchScalingWindow"
+                },
                 "Statistic": "Average",
-                "Threshold": "5000"
+                "Threshold": {
+                    "Ref": "ScaleOutAverageThreshold"
+                }
             },
             "Type": "AWS::CloudWatch::Alarm"
         },
         "AutoscalingGroup": {
             "Properties": {
+                "Cooldown": {
+                    "Ref": "ScalingActivityCoolOff"
+                },
                 "DesiredCapacity": {
                     "Ref": "DesiredCapacity"
                 },
-                "HealthCheckGracePeriod": "300",
+                "HealthCheckGracePeriod": 300,
                 "HealthCheckType": "ELB",
                 "LaunchConfigurationName": {
                     "Ref": "LaunchConfig"
@@ -129,7 +251,20 @@
                     {
                         "Key": "Name",
                         "PropagateAtLaunch": true,
-                        "Value": "NAT-instance"
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "AWS::StackName"
+                                    },
+                                    "-",
+                                    {
+                                        "Ref": "NATInstanceNames"
+                                    }
+                                ]
+                            ]
+                        }
                     }
                 ],
                 "VPCZoneIdentifier": {
@@ -467,7 +602,20 @@
                         "Protocol": "TCP"
                     }
                 ],
-                "LoadBalancerName": "NAT-LoadBalancer",
+                "LoadBalancerName": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "AWS::StackName"
+                            },
+                            "-",
+                            {
+                                "Ref": "LBName"
+                            }
+                        ]
+                    ]
+                },
                 "Scheme": "internal",
                 "SecurityGroups": [
                     {
