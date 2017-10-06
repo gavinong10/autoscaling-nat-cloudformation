@@ -12,9 +12,10 @@ import troposphere.ec2 as ec2
 
 import sys
 
-import troposphere.elasticloadbalancing as elb
-from troposphere.elasticloadbalancing import Policy as ELBPolicy
-from troposphere.elasticloadbalancing import LoadBalancer
+# import troposphere.elasticloadbalancing as elb
+import troposphere.elasticloadbalancingv2 as elb
+# from troposphere.elasticloadbalancingv2 import Policy as ELBPolicy
+# from troposphere.elasticloadbalancingv2 import LoadBalancer
 
 from troposphere.autoscaling import AutoScalingGroup, Tag
 from troposphere.autoscaling import LaunchConfiguration
@@ -397,37 +398,94 @@ LaunchConfig = t.add_resource(LaunchConfiguration(
     ),
 )
 
-LoadBalancerResource = t.add_resource(LoadBalancer(
-    "LoadBalancer",
-    ConnectionDrainingPolicy=elb.ConnectionDrainingPolicy(
-        Enabled=True,
-        Timeout=120,
-    ),
-    Subnets=Ref(SubnetsWithS3EndpointParam),
-    HealthCheck=elb.HealthCheck(
-        Target="TCP:80",
-        HealthyThreshold=6,
-        UnhealthyThreshold=2, #TODO: UPDATE TO REASONABLE, like 2
-        Interval=10, #TODO: UPDATE TO 10
-        Timeout=5,
-    ),
-    Listeners=[
-        elb.Listener(
-            LoadBalancerPort="80",
-            InstancePort="80",
-            Protocol="TCP",
-        ),
-        elb.Listener(
-            LoadBalancerPort="443",
-            InstancePort="443",
-            Protocol="TCP",
-        ),
-    ],
-    CrossZone=True,
-    SecurityGroups=[Ref(AutoscalingSecurityGroupParam)],
-    LoadBalancerName=Join("", [Ref("AWS::StackName"), "-", Ref(LBNameParam)]),
+# LoadBalancerResource = t.add_resource(LoadBalancer(
+#     "LoadBalancer",
+#     ConnectionDrainingPolicy=elb.ConnectionDrainingPolicy(
+#         Enabled=True,
+#         Timeout=120,
+#     ),
+#     Subnets=Ref(SubnetsWithS3EndpointParam),
+#     HealthCheck=elb.HealthCheck(
+#         Target="TCP:80",
+#         HealthyThreshold=6,
+#         UnhealthyThreshold=2, #TODO: UPDATE TO REASONABLE, like 2
+#         Interval=10, #TODO: UPDATE TO 10
+#         Timeout=5,
+#     ),
+#     Listeners=[
+#         elb.Listener(
+#             LoadBalancerPort="80",
+#             InstancePort="80",
+#             Protocol="TCP",
+#         ),
+#         elb.Listener(
+#             LoadBalancerPort="443",
+#             InstancePort="443",
+#             Protocol="TCP",
+#         ),
+#     ],
+#     CrossZone=True,
+#     SecurityGroups=[Ref(AutoscalingSecurityGroupParam)],
+#     LoadBalancerName=Join("", [Ref("AWS::StackName"), "-", Ref(LBNameParam)]),
+#     Scheme="internal",
+# ))
+
+NATLoadBalancerResource = t.add_resource(elb.LoadBalancer(
+    "NATLoadBalancer",
+    Name=Join("", [Ref("AWS::StackName"), "-", Ref(LBNameParam)]),
     Scheme="internal",
+    SecurityGroups=[Ref(AutoscalingSecurityGroupParam)],
+    Subnets=Ref(SubnetsWithS3EndpointParam),
+    Type="network",
 ))
+
+# Create ELB target groups
+NATLBTargetGroup80Resource = t.add_resource(elb.TargetGroup(
+    "NATLBTargetGroup80",
+    Name=Join("", [Ref("AWS::StackName"), "-", Ref(LBNameParam), "-tgt80"]),
+    HealthCheckIntervalSeconds=10,
+    HealthyThresholdCount=6,
+    UnhealthyThresholdCount=2,
+    Protocol="TCP",
+    Port=80,
+    VpcId=Ref(VPCIDParam),
+))
+
+NATLBTargetGroup443Resource = t.add_resource(elb.TargetGroup(
+    "NATLBTargetGroup443",
+    Name=Join("", [Ref("AWS::StackName"), "-", Ref(LBNameParam), "-tgt443"]),
+    HealthCheckIntervalSeconds=10,
+    HealthyThresholdCount=6,
+    UnhealthyThresholdCount=2,
+    Protocol="TCP",
+    Port=443,
+    VpcId=Ref(VPCIDParam),
+))
+
+NATLoadBalancerListener80Resource = t.add_resource(elb.Listener(
+    "NATLoadBalancerListener80",
+    DefaultActions=[
+        elb.Action(
+        Type="forward",
+        TargetGroupArn=Ref(NATLBTargetGroup80Resource)
+    )],
+    LoadBalancerArn=Ref(NATLoadBalancerResource),
+    Port=elb.network_port(80),
+    Protocol="TCP",
+))
+
+NATLoadBalancerListener443Resource = t.add_resource(elb.Listener(
+    "NATLoadBalancerListener443",
+    DefaultActions=[
+        elb.Action(
+        Type="forward",
+        TargetGroupArn=Ref(NATLBTargetGroup443Resource)
+    )],
+    LoadBalancerArn=Ref(NATLoadBalancerResource),
+    Port=elb.network_port(443),
+    Protocol="TCP",
+))
+
 AutoscalingGroup = t.add_resource(AutoScalingGroup(
     "AutoscalingGroup",
     DesiredCapacity=Ref(DesiredCapacityParam),
@@ -435,7 +493,9 @@ AutoscalingGroup = t.add_resource(AutoScalingGroup(
     MinSize=Ref(MinSizeParam),
     MaxSize=Ref(MaxSizeParam),
     VPCZoneIdentifier=Ref(SubnetsWithS3EndpointParam),
-    LoadBalancerNames=[Ref(LoadBalancerResource)],
+    # LoadBalancerNames=[Ref(LoadBalancerResource)],
+    TargetGroupARNs=[Ref(NATLBTargetGroup80Resource), 
+    Ref(NATLBTargetGroup443Resource)],
     # AvailabilityZones=[Ref(VPCAvailabilityZone1), Ref(VPCAvailabilityZone2)], # Not strictly required?
     HealthCheckType="ELB",
     HealthCheckGracePeriod=300,

@@ -236,11 +236,6 @@
                 "LaunchConfigurationName": {
                     "Ref": "LaunchConfig"
                 },
-                "LoadBalancerNames": [
-                    {
-                        "Ref": "LoadBalancer"
-                    }
-                ],
                 "MaxSize": {
                     "Ref": "MaxSize"
                 },
@@ -265,6 +260,14 @@
                                 ]
                             ]
                         }
+                    }
+                ],
+                "TargetGroupARNs": [
+                    {
+                        "Ref": "NATLBTargetGroup80"
+                    },
+                    {
+                        "Ref": "NATLBTargetGroup443"
                     }
                 ],
                 "VPCZoneIdentifier": {
@@ -576,33 +579,67 @@
             },
             "Type": "AWS::AutoScaling::LaunchConfiguration"
         },
-        "LoadBalancer": {
+        "NATLBTargetGroup443": {
             "Properties": {
-                "ConnectionDrainingPolicy": {
-                    "Enabled": true,
-                    "Timeout": 120
+                "HealthCheckIntervalSeconds": 10,
+                "HealthCheckTimeoutSeconds": 5,
+                "HealthyThresholdCount": 6,
+                "Name": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "AWS::StackName"
+                            },
+                            "-",
+                            {
+                                "Ref": "LBName"
+                            },
+                            "-tgt443"
+                        ]
+                    ]
                 },
-                "CrossZone": "true",
-                "HealthCheck": {
-                    "HealthyThreshold": 6,
-                    "Interval": 10,
-                    "Target": "TCP:80",
-                    "Timeout": 5,
-                    "UnhealthyThreshold": 2
+                "Port": 443,
+                "Protocol": "TCP",
+                "UnhealthyThresholdCount": 2,
+                "VpcId": {
+                    "Ref": "VPCID"
+                }
+            },
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup"
+        },
+        "NATLBTargetGroup80": {
+            "Properties": {
+                "HealthCheckIntervalSeconds": 10,
+                "HealthCheckTimeoutSeconds": 5,
+                "HealthyThresholdCount": 6,
+                "Name": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "AWS::StackName"
+                            },
+                            "-",
+                            {
+                                "Ref": "LBName"
+                            },
+                            "-tgt80"
+                        ]
+                    ]
                 },
-                "Listeners": [
-                    {
-                        "InstancePort": "80",
-                        "LoadBalancerPort": "80",
-                        "Protocol": "TCP"
-                    },
-                    {
-                        "InstancePort": "443",
-                        "LoadBalancerPort": "443",
-                        "Protocol": "TCP"
-                    }
-                ],
-                "LoadBalancerName": {
+                "Port": 80,
+                "Protocol": "TCP",
+                "UnhealthyThresholdCount": 2,
+                "VpcId": {
+                    "Ref": "VPCID"
+                }
+            },
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup"
+        },
+        "NATLoadBalancer": {
+            "Properties": {
+                "Name": {
                     "Fn::Join": [
                         "",
                         [
@@ -624,9 +661,46 @@
                 ],
                 "Subnets": {
                     "Ref": "SubnetsWithS3Endpoint"
-                }
+                },
+                "Type": "network"
             },
-            "Type": "AWS::ElasticLoadBalancing::LoadBalancer"
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer"
+        },
+        "NATLoadBalancerListener443": {
+            "Properties": {
+                "DefaultActions": [
+                    {
+                        "TargetGroupArn": {
+                            "Ref": "NATLBTargetGroup443"
+                        },
+                        "Type": "forward"
+                    }
+                ],
+                "LoadBalancerArn": {
+                    "Ref": "NATLoadBalancer"
+                },
+                "Port": 443,
+                "Protocol": "TCP"
+            },
+            "Type": "AWS::ElasticLoadBalancingV2::Listener"
+        },
+        "NATLoadBalancerListener80": {
+            "Properties": {
+                "DefaultActions": [
+                    {
+                        "TargetGroupArn": {
+                            "Ref": "NATLBTargetGroup80"
+                        },
+                        "Type": "forward"
+                    }
+                ],
+                "LoadBalancerArn": {
+                    "Ref": "NATLoadBalancer"
+                },
+                "Port": 80,
+                "Protocol": "TCP"
+            },
+            "Type": "AWS::ElasticLoadBalancingV2::Listener"
         },
         "ScaleInPolicy": {
             "Properties": {
