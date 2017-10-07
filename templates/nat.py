@@ -44,7 +44,7 @@ VPCIDParam = t.add_parameter(Parameter(
 # Subnet with S3 endpoint
 SubnetsWithS3EndpointParam = t.add_parameter(Parameter(
     "SubnetsWithS3Endpoint",
-    Description="The private subnets with a configured S3 endpoint. Recommended to be spread across multiple AZ's.",
+    Description="The private subnets with a configured S3 VPC endpoint. Recommended to be spread across multiple AZ's.",
     Type="List<AWS::EC2::Subnet::Id>",
 ))
 
@@ -55,19 +55,6 @@ KeyPairNameParam = t.add_parameter(Parameter(
     Type="AWS::EC2::KeyPair::KeyName",
     ConstraintDescription="must be the name of an existing EC2 KeyPair."
 ))
-
-# DeployUserAccessKey = t.add_parameter(Parameter(
-#     "DeployUserAccessKey",
-#     Type="String",
-#     Description="The access key of the deploy user",
-# ))
-
-# DeployUserSecretKey = t.add_parameter(Parameter(
-#     "DeployUserSecretKey",
-#     Type="String",
-#     NoEcho=True,
-#     Description="The secret key of the deploy user",
-# ))
 
 # Accept security group accepting port 80, 443 for autoscaling instances
 AutoscalingSecurityGroupParam = t.add_parameter(Parameter(
@@ -80,12 +67,12 @@ DeployBucket = t.add_parameter(Parameter(
     "DeployBucket",
     Type="String",
     Default="gong-cf-templates-magic",
-    Description="The S3 bucket with the cloudformation scripts.",
+    Description="The S3 bucket with the CloudFormation scripts and assets.",
 ))
 
 NATInstanceTypeParam = t.add_parameter(Parameter(
     "NATInstanceType",
-    Description="EC2 instance type for NAT autoscaling group",
+    Description="EC2 instance type for NAT autoscaling group. Recommend m4.large instance type. Change the CloudWatch scaling parameters if you change the instance type.",
     Type="String",
     Default="m4.large",
     ConstraintDescription="must be a valid EC2 instance type."
@@ -93,7 +80,7 @@ NATInstanceTypeParam = t.add_parameter(Parameter(
 
 DesiredCapacityParam = t.add_parameter(Parameter(
     "DesiredCapacity",
-    Description="Number of desired NAT instances",
+    Description="Initial number of NAT instances",
     Type="Number",
     Default=1
 ))
@@ -125,63 +112,59 @@ CloudWatchScalingWindowParam = t.add_parameter(Parameter(
     Type="Number",
     Default=300,
     AllowedValues=[
-        10,
-        30,
         60,
         300,
         900,
         3600,
-        21600,
-        86400
     ],
 
 ))
 
 ScaleOutAverageThresholdParam = t.add_parameter(Parameter(
     "ScaleOutAverageThreshold",
-    Description="In KB/s",
+    Description="In KiB/s",
     Type="Number",
     Default=25000
 ))
 
 ScaleOutConsecutivePeriodsParam = t.add_parameter(Parameter(
     "ScaleOutConsecutivePeriod",
-    Description="How many periods to consecutively breach  (can test with 100)",
+    Description="Scale out if the CloudWatch metric exceeds ScaleOutAverageThreshold for this number of periods consecutively",
     Type="Number",
     Default=1
 ))
 
 ScaleInAverageThresholdParam = t.add_parameter(Parameter(
     "ScaleInAverageThreshold",
-    Description="In KB/s (can test with 0)",
+    Description="In KB/s",
     Type="Number",
     Default=10000
 ))
 
 ScaleInConsecutivePeriodsParam = t.add_parameter(Parameter(
     "ScaleInConsecutivePeriod",
-    Description="How many periods to consecutively breach (can test with 100)",
+    Description="Scale in if the CloudWatch metric falls below ScaleInAverageThreshold for this number of periods consecutively",
     Type="Number",
     Default=5
 ))
 
 NATInstanceNamesParam = t.add_parameter(Parameter(
     "NATInstanceNames",
-    Description="Name of NAT instances",
+    Description="Base name tag to give the NAT instances",
     Type="String",
     Default="NAT-instance"
 ))
 
 LBNameParam = t.add_parameter(Parameter(
     "LBName",
-    Description="Name of LB",
+    Description="Base name tag for the load balancer",
     Type="String",
     Default="NAT-LB"
 ))
 
 NATNamespaceParam = t.add_parameter(Parameter(
     "NATNamespace",
-    Description="Name of NAT namespace",
+    Description="Base name of the CloudWatch namespace to group metrics in",
     Type="String",
     Default="NAT-namespace"
 ))
@@ -365,8 +348,7 @@ LaunchConfig = t.add_resource(LaunchConfiguration(
                     "init": {
                         "command": Join("", [
                             "/home/ec2-user/configure-s3-nat.sh && ",
-                            "/home/ec2-user/init-cron.sh \"",
-                            Ref("AWS::StackName"), "\" && ",
+                            "/home/ec2-user/init-cron.sh \"", Ref("AWS::StackName"), "\" && ",
                             "/home/ec2-user/test-s3-nat.sh"
                         ])
                     }
@@ -387,7 +369,7 @@ LaunchConfig = t.add_resource(LaunchConfiguration(
         "    --stack ", Ref("AWS::StackName"),
         "    --region ", Ref("AWS::Region"), "\n",
 
-        "cfn-signal -e $?", #"cfn-signal -e $?",
+        "cfn-signal -e $?", 
         "    --resource AutoscalingGroup",
         "    --stack ", Ref("AWS::StackName"),
         "    --region ", Ref("AWS::Region"), "\n"
@@ -396,43 +378,10 @@ LaunchConfig = t.add_resource(LaunchConfiguration(
     ),
 )
 
-# LoadBalancerResource = t.add_resource(LoadBalancer(
-#     "LoadBalancer",
-#     ConnectionDrainingPolicy=elb.ConnectionDrainingPolicy(
-#         Enabled=True,
-#         Timeout=120,
-#     ),
-#     Subnets=Ref(SubnetsWithS3EndpointParam),
-#     HealthCheck=elb.HealthCheck(
-#         Target="TCP:80",
-#         HealthyThreshold=6,
-#         UnhealthyThreshold=2, #TODO: UPDATE TO REASONABLE, like 2
-#         Interval=10, #TODO: UPDATE TO 10
-#         Timeout=5,
-#     ),
-#     Listeners=[
-#         elb.Listener(
-#             LoadBalancerPort="80",
-#             InstancePort="80",
-#             Protocol="TCP",
-#         ),
-#         elb.Listener(
-#             LoadBalancerPort="443",
-#             InstancePort="443",
-#             Protocol="TCP",
-#         ),
-#     ],
-#     CrossZone=True,
-#     SecurityGroups=[Ref(AutoscalingSecurityGroupParam)],
-#     LoadBalancerName=Join("", [Ref("AWS::StackName"), "-", Ref(LBNameParam)]),
-#     Scheme="internal",
-# ))
-
 NATLoadBalancerResource = t.add_resource(elb.LoadBalancer(
     "NATLoadBalancer",
     Name=Join("", [Ref("AWS::StackName"), "-", Ref(LBNameParam)]),
     Scheme="internal",
-    # SecurityGroups=[Ref(AutoscalingSecurityGroupParam)],
     Subnets=Ref(SubnetsWithS3EndpointParam),
     Type="network",
 ))
@@ -492,8 +441,7 @@ AutoscalingGroup = t.add_resource(AutoScalingGroup(
     MaxSize=Ref(MaxSizeParam),
     VPCZoneIdentifier=Ref(SubnetsWithS3EndpointParam),
     # LoadBalancerNames=[Ref(LoadBalancerResource)],
-    TargetGroupARNs=[Ref(NATLBTargetGroup80Resource), 
-    Ref(NATLBTargetGroup443Resource)],
+    TargetGroupARNs=[Ref(NATLBTargetGroup80Resource), Ref(NATLBTargetGroup443Resource)],
     # AvailabilityZones=[Ref(VPCAvailabilityZone1), Ref(VPCAvailabilityZone2)], # Not strictly required?
     HealthCheckType="ELB",
     HealthCheckGracePeriod=300,
@@ -511,15 +459,12 @@ AutoscalingGroup = t.add_resource(AutoScalingGroup(
     Tags = [
         {
             "Key": "Name",
-            "Value": Join("", [Ref("AWS::StackName"), "-", Ref(NATInstanceNamesParam)])
-, #TODO: Change me back
+            "Value": Join("", [Ref("AWS::StackName"), "-", Ref(NATInstanceNamesParam)]), 
             "PropagateAtLaunch": True
         }
     ],
     Cooldown=Ref(ScalingActivityCoolOffParam),
 ))
-
-
 
 ScaleOutPolicy = t.add_resource(ScalingPolicy(
     'ScaleOutPolicy',
@@ -539,7 +484,8 @@ ScaleInPolicy = t.add_resource(ScalingPolicy(
 
 AlarmScaleOutPolicy = t.add_resource(Alarm(
     "AlarmScaleOutPolicy",
-    AlarmDescription="Scale out if average traffic > 25000 KB/s for 5 minutes",
+    AlarmDescription=Join("", ["Scale out if average traffic > ", Ref(ScaleOutAverageThresholdParam), " KB/s for ",
+                               Ref(ScaleOutConsecutivePeriodsParam), " periods of ", Ref(CloudWatchScalingWindowParam), " seconds"]),
     MetricName="TotalKbytesPerSecond",
     Namespace=Join("", [Ref("AWS::StackName"), "-", Ref(NATNamespaceParam)]),
     Statistic="Average",
@@ -561,7 +507,8 @@ AlarmScaleOutPolicy = t.add_resource(Alarm(
 
 AlarmScaleInPolicy = t.add_resource(Alarm(
     "AlarmScaleInPolicy",
-    AlarmDescription="Scale in if average traffic < 10000 KB/s for 25 minutes",
+    AlarmDescription=Join("", ["Scale in if average traffic < ", Ref(ScaleInAverageThresholdParam), " KB/s for ",
+                               Ref(ScaleInConsecutivePeriodsParam), " periods of ", Ref(CloudWatchScalingWindowParam), " seconds"]),
     MetricName="TotalKbytesPerSecond",
     Namespace=Join("", [Ref("AWS::StackName"), "-", Ref(NATNamespaceParam)]),
     Statistic="Average",
