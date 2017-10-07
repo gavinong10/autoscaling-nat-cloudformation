@@ -5,10 +5,11 @@ INTERVAL="1"  # update interval in seconds
 INTERFACE="eth0"
 
 stackname=$1
+namespace=$2
 
 if [ -z "$stackname" ]; then
         echo
-        echo usage: $0 [stackname]
+        echo usage: $0 [stackname] [namespace]
         echo
         exit
 fi
@@ -38,4 +39,4 @@ totalkbytes=$(($CUM_RKBPS/5/1024))
 
 region=`curl -s 169.254.169.254/latest/meta-data/placement/availability-zone`
 region=${region::-1}
-aws cloudwatch put-metric-data --region "$region" --namespace "NATGroup" --metric-name "TotalKbytesPerSecond" --unit "Kilobytes/Second" --dimensions "StackName=$stackname" --value "$totalkbytes" --timestamp "`date -u "+%Y-%m-%dT%H:%M:%SZ"`" 
+aws cloudwatch put-metric-data --region "$region" --namespace "$namespace" --metric-name "TotalKbytesPerSecond" --unit "Kilobytes/Second" --dimensions "StackName=$stackname" --value "$totalkbytes" --timestamp "`date -u "+%Y-%m-%dT%H:%M:%SZ"`"        

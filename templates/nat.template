@@ -52,14 +52,10 @@
         },
         "CloudWatchScalingWindow": {
             "AllowedValues": [
-                10,
-                30,
                 60,
                 300,
                 900,
-                3600,
-                21600,
-                86400
+                3600
             ],
             "Default": 300,
             "Description": "How long in seconds to constitute a Cloudwatch Period",
@@ -67,12 +63,12 @@
         },
         "DeployBucket": {
             "Default": "gong-cf-templates-magic",
-            "Description": "The S3 bucket with the cloudformation scripts.",
+            "Description": "The S3 bucket with the CloudFormation scripts and assets.",
             "Type": "String"
         },
         "DesiredCapacity": {
             "Default": 1,
-            "Description": "Number of desired NAT instances",
+            "Description": "Initial number of NAT instances",
             "Type": "Number"
         },
         "KeyPairName": {
@@ -82,7 +78,7 @@
         },
         "LBName": {
             "Default": "NAT-LB",
-            "Description": "Name of LB",
+            "Description": "Base name tag for the load balancer",
             "Type": "String"
         },
         "MaxSize": {
@@ -97,38 +93,38 @@
         },
         "NATInstanceNames": {
             "Default": "NAT-instance",
-            "Description": "Name of NAT instances",
+            "Description": "Base name tag to give the NAT instances",
             "Type": "String"
         },
         "NATInstanceType": {
             "ConstraintDescription": "must be a valid EC2 instance type.",
             "Default": "m4.large",
-            "Description": "EC2 instance type for NAT autoscaling group",
+            "Description": "EC2 instance type for NAT autoscaling group. Recommend m4.large instance type. Change the CloudWatch scaling parameters if you change the instance type.",
             "Type": "String"
         },
         "NATNamespace": {
             "Default": "NAT-namespace",
-            "Description": "Name of NAT namespace",
+            "Description": "Base name of the CloudWatch namespace to group metrics in",
             "Type": "String"
         },
         "ScaleInAverageThreshold": {
             "Default": 10000,
-            "Description": "In KB/s (can test with 0)",
+            "Description": "In KB/s",
             "Type": "Number"
         },
         "ScaleInConsecutivePeriod": {
             "Default": 5,
-            "Description": "How many periods to consecutively breach (can test with 100)",
+            "Description": "Scale in if the CloudWatch metric falls below ScaleInAverageThreshold for this number of periods consecutively",
             "Type": "Number"
         },
         "ScaleOutAverageThreshold": {
             "Default": 25000,
-            "Description": "In KB/s",
+            "Description": "In KiB/s",
             "Type": "Number"
         },
         "ScaleOutConsecutivePeriod": {
             "Default": 1,
-            "Description": "How many periods to consecutively breach  (can test with 100)",
+            "Description": "Scale out if the CloudWatch metric exceeds ScaleOutAverageThreshold for this number of periods consecutively",
             "Type": "Number"
         },
         "ScalingActivityCoolOff": {
@@ -137,7 +133,7 @@
             "Type": "Number"
         },
         "SubnetsWithS3Endpoint": {
-            "Description": "The private subnets with a configured S3 endpoint. Recommended to be spread across multiple AZ's.",
+            "Description": "The private subnets with a configured S3 VPC endpoint. Recommended to be spread across multiple AZ's.",
             "Type": "List<AWS::EC2::Subnet::Id>"
         },
         "VPCID": {
@@ -153,7 +149,26 @@
                         "Ref": "ScaleInPolicy"
                     }
                 ],
-                "AlarmDescription": "Scale in if average traffic < 10000 KB/s for 25 minutes",
+                "AlarmDescription": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            "Scale in if average traffic < ",
+                            {
+                                "Ref": "ScaleInAverageThreshold"
+                            },
+                            " KB/s for ",
+                            {
+                                "Ref": "ScaleInConsecutivePeriod"
+                            },
+                            " periods of ",
+                            {
+                                "Ref": "CloudWatchScalingWindow"
+                            },
+                            " seconds"
+                        ]
+                    ]
+                },
                 "ComparisonOperator": "LessThanThreshold",
                 "Dimensions": [
                     {
@@ -198,7 +213,26 @@
                         "Ref": "ScaleOutPolicy"
                     }
                 ],
-                "AlarmDescription": "Scale out if average traffic > 25000 KB/s for 5 minutes",
+                "AlarmDescription": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            "Scale out if average traffic > ",
+                            {
+                                "Ref": "ScaleOutAverageThreshold"
+                            },
+                            " KB/s for ",
+                            {
+                                "Ref": "ScaleOutConsecutivePeriod"
+                            },
+                            " periods of ",
+                            {
+                                "Ref": "CloudWatchScalingWindow"
+                            },
+                            " seconds"
+                        ]
+                    ]
+                },
                 "ComparisonOperator": "GreaterThanThreshold",
                 "Dimensions": [
                     {
@@ -394,6 +428,14 @@
                                             "/home/ec2-user/init-cron.sh \"",
                                             {
                                                 "Ref": "AWS::StackName"
+                                            },
+                                            "\" \"",
+                                            {
+                                                "Ref": "AWS::StackName"
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "NATNamespace"
                                             },
                                             "\" && ",
                                             "/home/ec2-user/test-s3-nat.sh"

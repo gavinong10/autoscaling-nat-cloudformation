@@ -344,11 +344,12 @@ LaunchConfig = t.add_resource(LaunchConfiguration(
                         group="root",
                         authentication="DeployUserAuth"),
                 }),
+
                 commands={
                     "init": {
                         "command": Join("", [
                             "/home/ec2-user/configure-s3-nat.sh && ",
-                            "/home/ec2-user/init-cron.sh \"", Ref("AWS::StackName"), "\" && ",
+                            "/home/ec2-user/init-cron.sh \"", Ref("AWS::StackName"), "\" \"", Ref("AWS::StackName"), "-", Ref(NATNamespaceParam), "\" && ",
                             "/home/ec2-user/test-s3-nat.sh"
                         ])
                     }
