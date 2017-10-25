@@ -23,7 +23,7 @@ function die {
 export PATH="/usr/sbin:/sbin:/usr/bin:/bin"
 
 # Get the IP of this instance
-MY_IP=$(curl --retry 3 --silent --fail http://instance-data/latest/meta-data/local-ipv4)
+MY_IP=$(curl --retry 3 --silent --fail http://169.254.169.254/latest/meta-data/local-ipv4)
 
 if [ $? -ne 0 ]; then
     die "Unable to retrieve the IP address of this instance"
@@ -37,7 +37,7 @@ function lookup_s3_ip {
 	    yum install -y jq
 	fi
     
-	REGION=$(curl --retry 3 --silent --fail http://instance-data/latest/dynamic/instance-identity/document | jq -r .region)
+	REGION=$(curl --retry 3 --silent --fail http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
 
 	if [ "${REGION}" = "us-east-1" ]; then
             S3_DOMAINNAME="s3.amazonaws.com"
