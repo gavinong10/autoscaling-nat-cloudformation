@@ -20,7 +20,7 @@ if [ "${S3_DOMAINNAME}" = "DEFAULT" ]; then
 	yum install -y jq
     fi
     
-    REGION=$(curl --retry 3 --silent --fail http://169.254.169.254/instance-data/latest/dynamic/instance-identity/document | jq -r .region)
+    REGION=$(curl --retry 3 --silent --fail http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
 
     if [ "${REGION}" = "us-east-1" ]; then
         S3_DOMAINNAME="s3.amazonaws.com"
