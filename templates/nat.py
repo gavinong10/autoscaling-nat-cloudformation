@@ -66,7 +66,7 @@ AutoscalingSecurityGroupParam = t.add_parameter(Parameter(
 DeployBucket = t.add_parameter(Parameter(
     "DeployBucket",
     Type="String",
-    Default="gong-cf-templates-magic",
+    Default="storreduce-production-cf-templates",
     Description="The S3 bucket with the CloudFormation scripts and assets.",
 ))
 
@@ -271,7 +271,7 @@ LaunchConfig = t.add_resource(LaunchConfiguration(
                         source=Join('', [
                             "http://",
                             Ref(DeployBucket),
-                            ".s3.amazonaws.com/scripts/init-cron.sh"
+                            ".s3.", Ref("AWS::Region"), ".amazonaws.com/scripts/init-cron.sh"
                         ]),
                         mode="000550",
                         owner="root",
@@ -282,7 +282,7 @@ LaunchConfig = t.add_resource(LaunchConfiguration(
                         source=Join('', [
                             "http://",
                             Ref(DeployBucket),
-                            ".s3.amazonaws.com/scripts/configure-s3-nat.sh"
+                            ".s3.", Ref("AWS::Region"), ".amazonaws.com/scripts/configure-s3-nat.sh"
                         ]),
                         mode="000550",
                         owner="root",
@@ -293,7 +293,7 @@ LaunchConfig = t.add_resource(LaunchConfiguration(
                         source=Join('', [
                             "http://",
                             Ref(DeployBucket),
-                            ".s3.amazonaws.com/scripts/metrics.sh"
+                            ".s3.", Ref("AWS::Region"), ".amazonaws.com/scripts/metrics.sh"
                         ]),
                         mode="000550",
                         owner="root",
@@ -304,7 +304,7 @@ LaunchConfig = t.add_resource(LaunchConfiguration(
                         source=Join('', [
                             "http://",
                             Ref(DeployBucket),
-                            ".s3.amazonaws.com/scripts/nat-globals.sh"
+                            ".s3.", Ref("AWS::Region"), ".amazonaws.com/scripts/nat-globals.sh"
                         ]),
                         mode="000550",
                         owner="root",
@@ -315,7 +315,7 @@ LaunchConfig = t.add_resource(LaunchConfiguration(
                         source=Join('', [
                             "http://",
                             Ref(DeployBucket),
-                            ".s3.amazonaws.com/scripts/nat-lib.sh"
+                            ".s3.", Ref("AWS::Region"), ".amazonaws.com/scripts/nat-lib.sh"
                         ]),
                         mode="000550",
                         owner="root",
@@ -326,7 +326,7 @@ LaunchConfig = t.add_resource(LaunchConfiguration(
                         source=Join('', [
                             "http://",
                             Ref(DeployBucket),
-                            ".s3.amazonaws.com/scripts/s3-nat-watchdog.sh"
+                            ".s3.", Ref("AWS::Region"), ".amazonaws.com/scripts/s3-nat-watchdog.sh"
                         ]),
                         mode="000550",
                         owner="root",
@@ -337,7 +337,7 @@ LaunchConfig = t.add_resource(LaunchConfiguration(
                         source=Join('', [
                             "http://",
                             Ref(DeployBucket),
-                            ".s3.amazonaws.com/scripts/test-s3-nat.sh"
+                            ".s3.", Ref("AWS::Region"), ".amazonaws.com/scripts/test-s3-nat.sh"
                         ]),
                         mode="000550",
                         owner="root",
